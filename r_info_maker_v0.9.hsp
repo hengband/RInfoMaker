@@ -1,0 +1,1131 @@
+	#packopt name "r_info_maker"
+
+	goto*start
+	
+	//オブジェクト指向/構造体
+	#module DataMap infoArray, japanArray, wordLength, arrayLength, arrayCount
+		#modinit int wLength, int aLength
+			sdim infoArray, wLength, aLength
+			sdim japanArray, wLength, aLength
+			arrayCount=0
+		return
+
+		#modfunc setData str dInfo, str dJapan
+			infoArray(arrayCount)=dInfo
+			japanArray(arrayCount)=dJapan
+			arrayCount++
+		return
+
+		#modcfunc getJapan int gdIndex
+			gdReturn=infoArray(gdIndex)
+			if japanArray(gdIndex)!="" : gdReturn=japanArray(gdIndex)
+		return gdReturn
+
+		#modcfunc getInfo int giIndex
+		return infoArray(giIndex)
+
+		#modcfunc putCheckBoxes array fArray, array gHead, array gName, int cboxSize, int rLength
+			cboxBaseX=ginfo_cx
+			cboxBaseY=ginfo_cy
+			cboxBaseId=0
+			pos -cboxSize+cboxBaseX,cboxBaseY
+			objsize cboxSize
+			cboxg=-1
+			cboxs=""
+			repeat
+				i=cnt
+				if i==rLength : break
+				if gHead(cboxg+1)==i {
+					cboxg++
+					//if gName(cboxg)==END_GROUP : break
+					pos ginfo_cx+cboxSize, cboxBaseY
+					//font "ＭＳ ゴシック", GROUP_FONT,1
+					//mes groupName(cboxg,dataMode)
+					//sysfont
+				}
+				cboxs=getJapan(thismod,i)
+				chkbox cboxs,fArray(i)
+				if i==0 : cboxBaseId=stat
+			loop
+		//if cboxBaseId==0 : dialog "cboxBaseId==0"
+		return cboxBaseId
+
+		#modcfunc getCurrentCount
+		return arrayCount
+
+		#modcfunc searchInfo str searchStr
+			searched=-1
+			repeat arrayCount
+				i=cnt
+				if infoArray(i)==searchStr : searched=i : break
+			loop
+		return searched
+	#global //構造体終了
+
+*start
+	gosub *initialize
+	gosub *makeMainWindow
+	gosub *makeSubWindow
+	gsel 0,1
+	stop
+
+	#define GSE_MAIN 0
+	#define GSEL_F 1
+	#define GSEL_S 2
+	#define MELEE_MAX 4
+	#define ESCORT_MAX 6
+	#define DROP_MAX 6
+	#define LINE_FLAG_MAX 6
+	
+	#define WM_ACTIVATE $6
+
+*initialize
+//初期ウィンドウをサイズ調節可能&最大化可能にするWinAPI
+//	#include "user32.as"
+//	screen 0, ginfo(20), ginfo(21)
+//	GetWindowLong hwnd, -16
+//	SetWindowLong hwnd, -16, stat | $10000 | $40000
+	screen 0,1280,720
+	title "r_info_maker
+	color 255,255,200
+	boxf
+	color
+	
+	screen 1,1100,550,8
+	title "Flags for F"
+	color 255,200,200
+	boxf
+	color
+	
+	screen 2,680,620,8
+	title "Flags for S"
+	color 200,200,255
+	boxf
+	color
+	
+	gsel GSEL_MAIN
+
+	oncmd gosub *activate, WM_ACTIVATE
+	onexit gosub *closing
+	//width 1280, 720
+
+	return
+
+*makeMainWindow
+
+//メインウィンドウデータ準備
+	dataInfoN=""
+	dataInfoE=""
+	gosub *prepareG
+	dataJapanI="加速\nHP\n感知範囲\nAC\n警戒度"
+	wordLengthI=7
+	split dataJapanI,"\n",dataJapanI
+	sdim dataInfoI,wordLengthI,stat
+	repeat length(dataInfoI) : dataInfoI(cnt)="0" : loop
+	dataJapanW="階層\nレア度\n経験値\n進化経験値\n進化先"
+	wordLengthW=7
+	split dataJapanW,"\n",dataJapanW
+	dim dataInfoW,stat
+	dataInfoW(1)=1
+	gosub *prepareB
+	dataJapanV="V値"
+	dataInfoV=0
+	wordLengthR2=7
+	dim dataInfoR1, ESCORT_MAX
+	sdim dataInfoR2, wordLengthR2, ESCORT_MAX
+	dim dataInfoA1, DROP_MAX
+	dim dataInfoA2, DROP_MAX
+	wordLengthA3=7
+	sdim dataInfo, wordLengthA3, DROP_MAX 
+	dataInfoD1=""
+	dataInfoD2=""
+	
+	dataInputId=0
+	dataOutputId=0
+	dataInOut=""
+	dataInOutId=0
+	
+//メインウィンドウに設置
+	#define BIG_DISTANCE 80
+	#define TEXT_OFFSET 6
+	objectX=64
+	objectY=24
+	objsize objectX, objectY
+	baseX=12
+
+	pos baseX,
+	mes "日本語名",1
+	temp=ginfo_cx
+	input dataInfoN,1200,,100
+	baseIdN=stat
+	pos baseX,ginfo_cy
+	mes "英語名",1
+	pos temp,
+	input dataInfoE,1200,,200
+	baseIdE=stat
+	baseY=ginfo_cy
+
+	pos baseX,
+	mes "G"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cy
+	mes dataJapanG(0)
+	pos ,ginfo_cy+TEXT_OFFSET
+	mes dataJapanG(1)
+	pos ginfo_cx+BIG_DISTANCE,temp
+	input dataInfoG1,,,wordLengthG
+	baseIdG=stat
+	combox dataInfoG2,,comboMessageG2
+
+	pos baseX, ginfo_cy+24
+	mes "V 闘技場控除倍率" //引用　(ギャンブル場における)モンスター闘技場の控除倍率
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cy
+	mes "V値"
+	pos ginfo_cx+BIG_DISTANCE, temp
+	input dataInfoV,,,4
+	baseIdV=stat
+
+	pos ginfo_cx+BIG_DISTANCE,baseY
+	mes "I"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cy
+	repeat length(dataJapanI)
+		i=cnt
+		mes dataJapanI(i)
+		pos ,ginfo_cy+TEXT_OFFSET
+	loop
+	pos ginfo_cx+BIG_DISTANCE,temp
+	repeat length(dataInfoI)
+		i=cnt
+		input dataInfoI(i),,,wordLengthI
+		if i==0 : baseIdI=stat
+	loop
+
+	pos ginfo_cx+BIG_DISTANCE,baseY
+	mes "W"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cy
+	repeat length(dataJapanW)
+		i=cnt
+		mes dataJapanW(i)
+		pos ,ginfo_cy+TEXT_OFFSET
+	loop
+	pos ginfo_cx+BIG_DISTANCE,temp
+	repeat length(dataInfoW)
+		i=cnt
+		input dataInfoW(i),,,wordLengthW
+		if i==0 : baseIdW=stat
+	loop
+
+	objectX=108
+	objsize objectX, objectY
+	pos ginfo_cx+BIG_DISTANCE,baseY
+	mes "B 近接攻撃 行動/効果/ダメージ"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cx
+	repeat MELEE_MAX
+		i=cnt
+		mes dataJapanB0+(i+1),1
+		pos ginfo_cx+BIG_DISTANCE-60,
+		combox dataInfoBM(i),,comboMessageBM
+		if i==0 : baseIdB=stat
+		pos ginfo_cx+objectX, ginfo_cy-objectY
+		combox dataInfoBE(i),,comboMessageBE
+		pos ginfo_cx-objectX, ginfo_cy//-objectY
+		input dataInfoBD(i),,,wordLengthBD
+		pos temp, ginfo_cy+TEXT_OFFSET
+	loop
+
+	objectX=64
+	objsize objectX, objectY
+	pos ginfo_cx+BIG_DISTANCE*3+50, baseY
+	mes "R　護衛　番号/匹数"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cx
+	repeat ESCORT_MAX
+		i=cnt
+		mes "護衛"+(i+1),1
+		pos ginfo_cx+BIG_DISTANCE-50,
+		input dataInfoR1(i),,,5
+		if i==0 : baseIdR=stat
+		pos ginfo_cx+objectX, ginfo_cy-objectY
+		input dataInfoR2(i),,,wordLengthR2
+		pos temp, ginfo_cy
+	loop
+
+	objectX=48
+	objsize objectX, objectY
+	pos ginfo_cx+BIG_DISTANCE*3-20, baseY
+	mes "A ドロップ 番号/???/確率"
+	pos ,ginfo_cy+TEXT_OFFSET
+	temp=ginfo_cx
+	repeat DROP_MAX
+		i=cnt
+		mes "AF"+(i+1),1
+		pos ginfo_cx+BIG_DISTANCE-40,
+		input dataInfoA1(i),,,5
+		if i==0 : baseIdA=stat
+		pos ginfo_cx+objectX, ginfo_cy-objectY
+		input dataInfoA2(i),,,5
+		pos ginfo_cx+objectX, ginfo_cy-objectY
+		input dataInfoA3(i),,,wordLengthR2
+		pos temp, ginfo_cy
+	loop
+	
+
+	//inputX=700
+	//inputY=200
+	inputX=600
+	inputY=188
+	bottomY=284
+	pos baseX,bottomY
+	mes "日本語フレーバー"
+	pos ,ginfo_cy+TEXT_OFFSET
+	//temp=ginfo_cx
+	mesbox dataInfoD1, inputX, inputY,,0
+	baseIdD=stat
+	//pos 0,ginfo_cy
+	mes "英語フレーバー"
+	pos ,ginfo_cy+TEXT_OFFSET
+	//pos temp,
+	mesbox dataInfoD2, inputX, inputY,,0
+
+	objectX=72
+	distanceX=12
+	objsize objectX, objectY
+	pos ginfo_cx+inputX+30, bottomY
+	temp=ginfo_cx
+	mes "r_info　",1
+	button "出力",*rinfoOutput
+	pos ginfo_cx+objectX+distanceX,ginfo_cy-objectY
+	button "入力",*rinfoInput
+	//pos ginfo_cx+objectX+distanceX,ginfo_cy-objectY
+	//button "保存",*rinfoFileOutput
+	//pos ginfo_cx+objectX+distanceX,ginfo_cy-objectY
+	//button "読込",*rinfoFileInput
+	pos temp,
+	mesbox dataInOut,600,400,,0
+	dataInOutId=stat
+	return
+
+*prepareG
+	wordLengthG=1
+	dataJapanG="シンボル\n色"
+	split dataJapanG,"\n",dataJapanG
+	dataInfoG1=""
+	wordLength=4
+	arrayLength=16
+	newmod mapG2, DataMap, wordLength, arrayLength
+	setData mapG2,"D","黒"
+	setData mapG2,"w","白"
+	setData mapG2,"s","灰色"
+	setData mapG2,"o","オレンジ"
+	setData mapG2,"r","赤"
+	setData mapG2,"g","緑"
+	setData mapG2,"b","青"
+	setData mapG2,"u","茶色"
+	setData mapG2,"d","暗い灰色"
+	setData mapG2,"W","明るい灰色"
+	setData mapG2,"v","バイオレット"
+	setData mapG2,"y","黄色"
+	setData mapG2,"R","明るい赤"
+	setData mapG2,"G","明るい緑"
+	setData mapG2,"B","明るい青"
+	setData mapG2,"U","明るい茶色"
+	dataInfoG2=0
+	comboMessageG2=""
+	repeat getCurrentCount(mapG2)
+		i=cnt
+		if i>0 : comboMessageG2+="\n"
+		comboMessageG2+=getJapan(mapG2,i)
+	loop
+	return
+
+*prepareB
+	dataJapanB0="打撃"
+	//meleeMethodStr="(なし)\n殴る\n触る\nパンチする\n蹴る\nひっかく\n噛む\n刺す\n斬る\n角で突く\n体当りする\n飲み込む\n請求書をよこす\n体の上を這い回る\nよだれをたらす\nつばを吐く\n爆発する\nにらむ\n泣き叫ぶ\n胞子を飛ばす\n金をせがむ\n侮辱する\nうめく\n歌う"
+	//meleeEffectStr="FLAVOR\n強力に攻撃する\n攻撃する\n毒をくらわす\n劣化させる\n充填魔力を吸収する\n金を盗む\nアイテムを盗む\nあなたの食料を食べる\n明かりを吸収する\n酸を飛ばす\n感電させる\n燃やす\n凍らせる\n盲目にする\n混乱させる\n恐怖させる\n麻痺させる\n腕力を減少させる\n知能を減少させる\n賢さを減少させる\n器用さを減少させる\n耐久力を減少させる\n魅力を減少させる\n全ステータス減少\n粉砕する\n経験値10d6減少\n経験値20d6減少\n経験値40d6減少\n経験値80d6減少\n病気にする\n時間を逆戻りさせる\n生命力を吸収する\n魔力を奪う\n減速させる\n朦朧とさせる\n空腹を進行させる"
+	wordLength=10
+	arrayLength=30
+	newmod mapBM, DataMap, wordLength, arrayLength
+	setData mapBM,"NONE","(なし)"
+	setData mapBM,"HIT","殴る"
+	setData mapBM,"TOUCH","触る"
+	setData mapBM,"PUNCH","パンチする"
+	setData mapBM,"KICK","蹴る"
+	setData mapBM,"CLAW","ひっかく"
+	setData mapBM,"BITE","噛む"
+	setData mapBM,"STING","刺す"
+	setData mapBM,"SLASH","斬る"
+	setData mapBM,"BUTT","角で突く"
+	setData mapBM,"CRUSH","体当りする"
+	setData mapBM,"ENGULF","飲み込む"
+	setData mapBM,"CHARGE","請求書をよこす"
+	setData mapBM,"CRAWL","体の上を這い回る"
+	setData mapBM,"DROOL","よだれをたらす"
+	setData mapBM,"SPIT","つばを吐く"
+	setData mapBM,"EXPLODE","爆発する"
+	setData mapBM,"GAZE","にらむ"
+	setData mapBM,"WAIL","泣き叫ぶ"
+	setData mapBM,"SPORE","胞子を飛ばす"
+	setData mapBM,"BEG","金をせがむ"
+	setData mapBM,"INSULT","侮辱する"
+	setData mapBM,"MOAN","うめく"
+	setData mapBM,"SHOW","歌う"
+	setData mapBM,"SHOOT","射撃する"
+	
+	comboMessageBM=""
+	repeat getCurrentCount(mapBM)
+		i=cnt
+		if i>0 : comboMessageBM+="\n"
+		comboMessageBM+=getJapan(mapBM,i)
+	loop
+	//realLengthBM=getCurrentCount(mapBM)
+
+	newmod mapBE, DataMap, wordLength, arrayLength
+	setData mapBE,"FLAVOR","(なし)"
+	setData mapBE,"SUPERHURT","強力に攻撃する"
+	setData mapBE,"HURT","攻撃する"
+	setData mapBE,"POISON","毒をくらわす"
+	setData mapBE,"UN_BONUS","劣化させる"
+	setData mapBE,"UN_POWER","充填魔力を吸収する"
+	setData mapBE,"EAT_GOLD","金を盗む"
+	setData mapBE,"EAT_ITEM","アイテムを盗む"
+	setData mapBE,"EAT_FOOD","あなたの食料を食べる"
+	setData mapBE,"EAT_LITE","明かりを吸収する"
+	setData mapBE,"ACID","酸を飛ばす"
+	setData mapBE,"ELEC","感電させる"
+	setData mapBE,"FIRE","燃やす"
+	setData mapBE,"COLD","凍らせる"
+	setData mapBE,"BLIND","盲目にする"
+	setData mapBE,"CONFUSE","混乱させる"
+	setData mapBE,"TERRIFY","恐怖させる"
+	setData mapBE,"PARALYZE","麻痺させる"
+	setData mapBE,"LOSE_STR","腕力を減少させる"
+	setData mapBE,"LOSE_INT","知能を減少させる"
+	setData mapBE,"LOSE_WIS","賢さを減少させる"
+	setData mapBE,"LOSE_DEX","器用さを減少させる"
+	setData mapBE,"LOSE_CON","耐久力を減少させる"
+	setData mapBE,"LOSE_CHR","魅力を減少させる"
+	setData mapBE,"LOSE_ALL","全ステータスを減少させる"
+	setData mapBE,"SHATTER","粉砕する"
+	setData mapBE,"EXP_10","経験値を減少(10d6+)させる"
+	setData mapBE,"EXP_20","経験値を減少(20d6+)させる"
+	setData mapBE,"EXP_40","経験値を減少(40d6+)させる"
+	setData mapBE,"EXP_80","経験値を減少(80d6+)させる"
+	setData mapBE,"DISEASE","病気にする"
+	setData mapBE,"TIME","時間を逆戻りさせる"
+	setData mapBE,"EXP_VAMP","生命力を吸収する"
+	setData mapBE,"DR_MANA","魔力を奪う"
+	setData mapBE,"INERTIA","減速させる"
+	setData mapBE,"STUN","朦朧とさせる"
+	setData mapBE,"HUNGRY","空腹を進行させる"
+	//realLengthBE=getCurrentCount(mapBE)
+	
+	comboMessageBE=""
+	repeat getCurrentCount(mapBE)
+		i=cnt
+		if i>0 : comboMessageBE+="\n"
+		comboMessageBE+=getJapan(mapBE,i)
+	loop
+
+	dim dataInfoBM, MELEE_MAX
+	dim dataInfoBE, MELEE_MAX
+	wordLengthBD=7
+	sdim dataInfoBD, wordLength, MELEE_MAX
+	return
+	
+*makeSubWindow
+//第2、第3ウィンドウデータ準備
+	#define END_GROUP "END"
+
+	wordLength=12
+	arrayLength=200
+	newmod mapF, DataMap, wordLength, arrayLength
+	groupWordLength=6
+	groupArrayLength=10
+	dim groupHeadF, groupArrayLength
+	sdim groupNameF, groupWordLength, groupArrayLength
+	dim dataFlagF, arrayLength //chkboxで使用するフラグ
+
+	groupCnt=0
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"ドロップ等"
+	setData mapF,"UNIQUE","ユニーク"
+	setData mapF,"UNIQUE2",""
+	setData mapF,"QUESTOR",""
+	setData mapF,"CAN_SPEAK",""
+	setData mapF,"FORCE_DEPTH",""
+	setData mapF,"DROP_1D2",""
+	setData mapF,"DROP_2D2",""
+	setData mapF,"DROP_3D2",""
+	setData mapF,"DROP_4D2",""
+	setData mapF,"DROP_60",""
+	setData mapF,"DROP_90",""
+	setData mapF,"ONLY_ITEM",""
+	setData mapF,"ONLY_GOLD",""
+	setData mapF,"DROP_GOOD","上質ドロップ"
+	setData mapF,"DROP_GREAT","高級ドロップ"
+	setData mapF,"DROP_SKELETON","骨を落とす"
+	setData mapF,"DROP_CORPSE","死体を落とす"
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"種族等"
+	setData mapF,"ELDRITCH_HORROR","狂気を誘う"
+	setData mapF,"ANIMAL","自然界"
+	setData mapF,"EVIL","邪悪"
+	setData mapF,"GOOD","善良"
+	setData mapF,"UNDEAD","アンデッド"
+	setData mapF,"AMBERITE","アンバーの王族"
+	setData mapF,"DRAGON","ドラゴン"
+	setData mapF,"DEMON","デーモン"
+	setData mapF,"ANGEL","天使"
+	setData mapF,"GIANT","ジャイアント"
+	setData mapF,"TROLL","トロル"
+	setData mapF,"ORC","オーク"
+	setData mapF,"HUMAN","人間"
+	setData mapF,"QUANTUM","量子生物"
+	setData mapF,"MALE","男性"
+	setData mapF,"FEMALE","女性"
+	setData mapF,"NONLIVING","無生命"
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"視覚等"
+	setData mapF,"ATTR_MULTI",""
+	setData mapF,"CHAR_MULTI",""
+	setData mapF,"ATTR_CLEAR",""
+	setData mapF,"CHAR_CLEAR",""
+	setData mapF,"ATTR_SEMIRAND",""
+	setData mapF,"ATTR_ANY",""
+	setData mapF,"SHAPECHANGER",""
+	setData mapF,"INVISIBLE","透明である"
+	setData mapF,"COLD_BLOOD","冷血である"
+	setData mapF,"EMPTY_MIND","テレパシー不能"
+	setData mapF,"WEIRD_MIND","まれにテレパシー"
+	setData mapF,"HAS_LITE_1",""
+	setData mapF,"HAS_LITE_2",""
+	setData mapF,"HAS_DARK_1",""
+	setData mapF,"HAS_DARK_2",""
+	setData mapF,"SELF_LITE_1",""
+	setData mapF,"SELF_LITE_2",""
+	setData mapF,"SELF_DARK_1",""
+	setData mapF,"SELF_DARK_2",""
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"移動等"
+	setData mapF,"AQUATIC","水に棲む"
+	setData mapF,"RAND_25","不規則な移動25"
+	setData mapF,"RAND_50","不規則な移動50"
+	setData mapF,"NEVER_MOVE","追跡しない"
+	setData mapF,"OPEN_DOOR","ドアを開ける"
+	setData mapF,"BASH_DOOR","ドアを破る"
+	setData mapF,"CAN_FLY","空を飛ぶ"
+	setData mapF,"CAN_SWIM","水を渡る"
+	setData mapF,"PASS_WALL","壁を抜ける"
+	setData mapF,"KILL_WALL","壁を掘る"
+	setData mapF,"MOVE_BODY","敵を押しのける"
+	setData mapF,"KILL_BODY","敵を倒す"
+	setData mapF,"TAKE_ITEM","アイテムを拾う"
+	setData mapF,"KILL_ITEM","アイテムを壊す"
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"耐性"
+	setData mapF,"IM_ACID","酸耐性"
+	setData mapF,"IM_ELEC","電撃耐性"
+	setData mapF,"IM_FIRE","火炎耐性"
+	setData mapF,"IM_COLD","冷気耐性"
+	setData mapF,"IM_POIS","毒耐性"
+	setData mapF,"RES_LITE","閃光耐性"
+	setData mapF,"RES_DARK","暗黒耐性"
+	setData mapF,"RES_NETH","地獄耐性"
+	setData mapF,"RES_WATE","水流耐性"
+	setData mapF,"RES_PLAS","プラズマ耐性"
+	setData mapF,"RES_SHAR","破片耐性"
+	setData mapF,"RES_SOUN","轟音耐性"
+	setData mapF,"RES_CHAO","カオス耐性"
+	setData mapF,"RES_NEXU","因果混乱耐性"
+	setData mapF,"RES_DISE","劣化耐性"
+	setData mapF,"RES_WALL","フォース耐性"
+	setData mapF,"RES_INER","遅鈍耐性"
+	setData mapF,"RES_TIME","時間逆転耐性"
+	setData mapF,"RES_GRAV","重力耐性"
+	setData mapF,"RES_TELE","テレポート耐性"
+	setData mapF,"RES_ALL","あらゆる攻撃耐性"
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"特性"
+	setData mapF,"NEVER_BLOW","物理攻撃なし"
+	setData mapF,"PREVENT_SUDDEN_MAGIC","召喚酔いする"
+	setData mapF,"FORCE_MAXHP",""
+	setData mapF,"SMART","的確な魔法"
+	setData mapF,"STUPID",""
+	setData mapF,"POWERFUL",""
+	setData mapF,"REFLECTING","反射する"
+	setData mapF,"AURA_FIRE","火炎オーラ"
+	setData mapF,"AURA_COLD","冷気オーラ"
+	setData mapF,"AURA_ELEC ","電撃オーラ"
+	setData mapF,"MULTIPLY","増殖する"
+	setData mapF,"REGENERATE","急速回復する"
+	setData mapF,"RIDING","騎乗できる"
+	setData mapF,"NO_STUN","朦朧しない"
+	setData mapF,"NO_FEAR","恐怖しない"
+	setData mapF,"NO_CONF","混乱しない"
+	setData mapF,"NO_SLEEP","眠らされない"
+	setData mapF,"HURT_ROCK","岩石溶解弱点"
+	setData mapF,"HURT_FIRE","火炎弱点"
+	setData mapF,"HURT_COLD","冷気弱点"
+	setData mapF,"HURT_LITE","閃光弱点"
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"出現等"
+	setData mapF,"WILD_SHORE","地上/浅瀬"
+	setData mapF,"WILD_OCEAN","地上/海"
+	setData mapF,"WILD_WASTE","地上/荒野"
+	setData mapF,"WILD_WOOD","地上/森"
+	setData mapF,"WILD_VOLCANO","地上/火山"
+	setData mapF,"WILD_MOUNTAIN","地上/山"
+	setData mapF,"WILD_GRASS","地上/草原"
+	setData mapF,"WILD_SWAMP","地上/沼"
+	setData mapF,"WILD_TOWN","地上/町"
+	setData mapF,"WILD_ALL","地上/全て"
+	setData mapF,"WILD_ONLY","地上のみ"
+	setData mapF,"FRIENDS","集団生成"
+	setData mapF,"ESCORT",""
+	setData mapF,"ESCORTS",""
+	setData mapF,"FRIENDLY","友好的"
+	setData mapF,"NAZGUL",""
+	setData mapF,"KAGE",""
+	setData mapF,"CHAMELEON",""
+	setData mapF,"TANUKI",""
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"摂食1"
+	setData mapF,"EAT_GIVE_STR",""
+	setData mapF,"EAT_GIVE_INT",""
+	setData mapF,"EAT_GIVE_WIS",""
+	setData mapF,"EAT_GIVE_DEX",""
+	setData mapF,"EAT_GIVE_CON",""
+	setData mapF,"EAT_GIVE_CHR",""
+	setData mapF,"EAT_LOSE_STR",""
+	setData mapF,"EAT_LOSE_INT",""
+	setData mapF,"EAT_LOSE_WIS",""
+	setData mapF,"EAT_LOSE_DEX",""
+	setData mapF,"EAT_LOSE_CON",""
+	setData mapF,"EAT_LOSE_CHR",""
+	setData mapF,"EAT_ACID_RES",""
+	setData mapF,"EAT_ELEC_RES",""
+	setData mapF,"EAT_FIRE_RES",""
+	setData mapF,"EAT_COLD_RES",""
+	setData mapF,"EAT_POIS_RES",""
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),"摂食2"
+	setData mapF,"EAT_CURE",""
+	setData mapF,"EAT_MANA",""
+	setData mapF,"EAT_DRAIN_EXP",""
+	setData mapF,"EAT_DRAIN_MANA",""
+	setData mapF,"EAT_SPEED",""
+	setData mapF,"EAT_ACIDIC",""
+	setData mapF,"EAT_POISONOUS",""
+	setData mapF,"EAT_BLIND",""
+	setData mapF,"EAT_CONF",""
+	setData mapF,"EAT_SLEEP",""
+	setData mapF,"EAT_BERSERKER",""
+	setData mapF,"EAT_NEXUS",""
+	setData mapF,"EAT_INSANITY",""
+	setGroup groupHeadF, groupNameF, getCurrentCount(mapF),END_GROUP
+	realLengthF=getCurrentCount(mapF)
+	
+
+	wordLength=12
+	arrayLength=200
+	newmod mapS, DataMap, wordLength, arrayLength
+	groupWordLength=6
+	groupArrayLength=10
+	dim groupHeadS, groupArrayLength
+	sdim groupNameS, groupWordLength, groupArrayLength
+	dim dataFlagS, arrayLength
+	
+	groupCnt=0
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),"ブレス"
+	setData mapS,"BR_ACID","酸のブレス"
+	setData mapS,"BR_ELEC","電撃のブレス"
+	setData mapS,"BR_FIRE","火炎のブレス"
+	setData mapS,"BR_COLD","冷気のブレス"
+	setData mapS,"BR_POIS","毒のブレス"
+	setData mapS,"BR_NETH","地獄のブレス"
+	setData mapS,"BR_LITE","閃光のブレス"
+	setData mapS,"BR_DARK","暗黒のブレス"
+	setData mapS,"BR_PLAS","プラズマのブレス"
+	setData mapS,"BR_SHAR","破片のブレス"
+	setData mapS,"BR_SOUN","轟音のブレス"
+	setData mapS,"BR_CHAO","カオスのブレス"
+	setData mapS,"BR_NEXU","因果混乱のブレス"
+	setData mapS,"BR_DISE","劣化のブレス"
+	setData mapS,"BR_INER","遅鈍のブレス"
+	setData mapS,"BR_TIME","時間逆転のブレス"
+	setData mapS,"BR_GRAV","重力のブレス"
+	setData mapS,"BR_FORC","フォースのブレス"
+	setData mapS,"BR_CONF","混乱のブレス"
+	setData mapS,"BR_NUKE","放射性廃棄物のブレス"
+	setData mapS,"BR_MANA","魔力のブレス"
+	setData mapS,"BR_DISI","分解のブレス"
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),"ボール"
+	setData mapS,"BA_ACID","アシッド・ボール"
+	setData mapS,"BA_ELEC","サンダー・ボール"
+	setData mapS,"BA_FIRE","ファイア・ボール"
+	setData mapS,"BA_COLD","アイス・ボール"
+	setData mapS,"BA_POIS","悪臭雲"
+	setData mapS,"BA_NETH","地獄球"
+	setData mapS,"BA_WATE","ウォーター・ボール"
+	setData mapS,"BA_NUKE","放射能球"
+	setData mapS,"BA_MANA","魔力の嵐"
+	setData mapS,"BA_DARK","暗黒の嵐"
+	setData mapS,"BA_LITE","スターバースト"
+	setData mapS,"BA_CHAO","純ログルス"
+	setData mapS,"HAND_DOOM","破滅の手"
+	setData mapS,"PSY_SPEAR","光の剣"
+	setData mapS,"ROCKET","ロケット"
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),"ボルト"
+	setData mapS,"SHOOT","射撃"
+	setData mapS,"DRAIN_MANA","魔力吸収"
+	setData mapS,"MIND_BLAST","精神攻撃"
+	setData mapS,"BRAIN_SMASH","脳攻撃"
+	setData mapS,"CAUSE_1","軽傷＋呪い"
+	setData mapS,"CAUSE_2","重症＋呪い"
+	setData mapS,"CAUSE_3","致命傷＋呪い"
+	setData mapS,"CAUSE_4","秘孔を突く"
+	setData mapS,"BO_ACID","アシッド・ボルト"
+	setData mapS,"BO_ELEC","サンダー・ボルト"
+	setData mapS,"BO_FIRE","ファイア・ボルト"
+	setData mapS,"BO_COLD","アイス・ボルト"
+	setData mapS,"BO_NETH","地獄の矢"
+	setData mapS,"BO_WATE","ウォーター・ボルト"
+	setData mapS,"BO_MANA","魔力の矢"
+	setData mapS,"BO_PLAS","プラズマ・ボルト"
+	setData mapS,"BO_ICEE","極寒の矢"
+	setData mapS,"MISSILE","マジックミサイル"
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),"妨害"
+	setData mapS,"SHRIEK","悲鳴を上げる"
+	setData mapS,"SCARE","恐怖"
+	setData mapS,"BLIND","目くらまし"
+	setData mapS,"CONF","混乱"
+	setData mapS,"SLOW","減速"
+	setData mapS,"HOLD","麻痺"
+	setData mapS,"HASTE","加速"
+	setData mapS,"HEAL","治癒"
+	setData mapS,"INVULNER","無敵化"
+	setData mapS,"DISPEL","魔力消去"
+	setData mapS,"BLINK","ショートテレポート"
+	setData mapS,"TPORT","テレポート"
+	setData mapS,"WORLD","時を止める"
+	setData mapS,"TELE_TO","テレポートバック"
+	setData mapS,"TELE_AWAY","テレポートアウェイ"
+	setData mapS,"TELE_LEVEL","テレポート・レベル"
+	setData mapS,"DARKNESS","暗闇/閃光"
+	setData mapS,"TRAPS","トラップ"
+	setData mapS,"FORGET","記憶消去"
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),"召喚"
+	setData mapS,"ANIM_DEAD","死者復活"
+	setData mapS,"S_MONSTER","モンスター一体召喚"
+	setData mapS,"S_MONSTERS","モンスター複数召喚"
+	setData mapS,"S_KIN","救援召喚"
+	setData mapS,"S_ANT","アリ召喚"
+	setData mapS,"S_SPIDER","クモ召喚"
+	setData mapS,"S_HOUND","ハウンド召喚"
+	setData mapS,"S_HYDRA","ヒドラ召喚"
+	setData mapS,"S_ANGEL","天使召喚"
+	setData mapS,"S_DEMON","デーモン召喚"
+	setData mapS,"S_UNDEAD","アンデッド召喚"
+	setData mapS,"S_DRAGON","ドラゴン召喚"
+	setData mapS,"S_HI_UNDEAD","強力なアンデッド召喚"
+	setData mapS,"S_HI_DRAGON","古代ドラゴン召喚"
+	setData mapS,"S_CYBER","サイバーデーモン召喚"
+	setData mapS,"S_AMBERITES","アンバーの王族召喚"
+	setData mapS,"S_UNIQUE","ユニーク・モンスター召喚"
+	setData mapS,"SPECIAL","特別な行動"
+	setGroup groupHeadS, groupNameS, getCurrentCount(mapS),END_GROUP
+	realLengthS=getCurrentCount(mapS)
+	
+	//dialog "dataCntF="+dataCntF
+
+	gsel GSEL_F
+	checkBoxSize=120
+	buttonX=0
+	buttonY=0
+	pos buttonX, buttonY
+	buttonBaseF=putButtons(groupNameF, checkBoxSize)
+	checkBoxX=0
+	checkBoxY=35
+	pos checkBoxX, checkBoxY
+	checkBoxBaseF=putCheckBoxes(mapF, dataFlagF, groupHeadF, groupNameF, checkBoxSize, realLengthF)
+	
+
+	gsel GSEL_S
+	mes "魔法使用率"+" 1_IN_",1
+	input dataInfoS,40,,3
+	baseIdS=stat
+	checkBoxSize=130
+	buttonX=0
+	buttonY=30
+	pos buttonX, buttonY
+	buttonBaseS=putButtons(groupNameS, checkBoxSize)
+	checkBoxX=0
+	checkBoxY=70
+	pos checkBoxX, checkBoxY
+	checkBoxBaseS=putCheckBoxes(mapS, dataFlagS, groupHeadS, groupNameS, checkBoxSize, realLengthS)
+	//dialog "bbF"+buttonBaseF+"\ncbF"+checkBoxBaseF+"\nbbS"+buttonBaseS+"\ncbS"+checkBoxBaseS
+	return
+
+	//命令定義
+	#defcfunc putButtons array gNameArray, int btnSize
+		btnBaseX=ginfo_cx
+		btnBaseY=ginfo_cy
+		btnBaseId=0
+		objsize btnSize
+		pos btnBaseX, btnBaseY
+		repeat
+			i=cnt
+			if gNameArray(i)==END_GROUP : break
+			button gNameArray(i),*toggleCheckBoxes
+			if i==0 : btnBaseId=stat
+			pos ginfo_cx+btnSize,btnBaseY
+		loop
+	return btnBaseId
+
+		
+	#deffunc setGroup array gHeadArray, array gNameArray, int dmapCount, str gName
+		gHeadArray(groupCnt)=dmapCount
+		gNameArray(groupCnt)=gName
+		groupCnt++
+	return
+
+*toggleCheckBoxes
+	pressedButton=stat
+	pressedWindow=ginfo_act
+	buttonToggleId=0
+	checkBoxToggleId=0
+	if pressedWindow==GSEL_F {
+		buttonToggleId=pressedButton-buttonBaseF
+		checkBoxToggleId=groupHeadF(buttonToggleId)+checkBoxBaseF
+		processToggleCheckBoxes checkBoxToggleId, groupHeadF(buttonToggleId+1)+checkBoxBaseF, GSEL_F, dataFlagF(checkBoxToggleId)
+	} else : if pressedWindow==GSEL_S {
+		buttonToggleId=pressedButton-buttonBaseS
+		checkBoxToggleId=groupHeadS(buttonToggleId)+checkBoxBaseS
+		processToggleCheckBoxes checkBoxToggleId, groupHeadS(buttonToggleId+1)+checkBoxBaseS, GSEL_S, dataFlagS(checkBoxToggleId)
+	} else : stop
+	stop
+
+	#deffunc processToggleCheckBoxes int ptcboxStart, int ptcboxEnd, int ptcboxWindow, int ptcboxFlag
+		//dialog "start/"+ptcboxStart+"\nend/"+ptcboxEnd+"\nwind/"+ptcboxWindow+"\nflag/"+ptcboxFlag
+		gsel ptcboxWindow
+		ptcboxAll=(ptcboxFlag==0)
+		repeat ptcboxEnd-ptcboxStart
+			i=cnt
+			objprm ptcboxStart+i,ptcboxAll
+		loop
+	return
+
+	#define ACCEL_PLUS 110
+	#define ACCEL_ID 0
+	
+*rinfoOutput
+	outputMessage="N:XXXX:"+dataInfoN
+	outputMessage+="\nE:"+dataInfoE
+	outputMessage+="\nG:"+dataInfoG1+":"+getInfo(mapG2,dataInfoG2)
+	outputMessage+="\nI"
+	repeat length(dataInfoI)
+		i=cnt
+		if i==ACCEL_ID {
+			outputMessage+=":"+(ACCEL_PLUS+int(dataInfoI(i))) 
+		} else : outputMessage+=":"+dataInfoI(i) 
+	loop
+	outputMessage+="\nW" //謎の0を挟む必要がある
+	repeat length(dataInfoW)+1
+		i=cnt
+		outputMessage+=":"
+		if i<2 { outputMessage+=dataInfoW(i)
+		} else : if i==2 { outputMessage+="0"
+		} else : outputMessage+=dataInfoW(i-1)
+	loop
+	repeat MELEE_MAX
+		i=cnt
+		if dataInfoBM(i)>0 {
+			outputMessage+="\nB:"+getInfo(mapBM,dataInfoBM(i))+":"+getInfo(mapBE,dataInfoBE(i))+":"+dataInfoBD(i)
+		}
+	loop
+	g=-1
+	checkFlag=0
+	repeat getCurrentCount(mapF)
+		i=cnt
+		if dataFlagF(i)==1 {
+			if checkFlag==0 {
+				outputMessage+="\nF:"
+			} else : if checkFlag>0 {
+				outputMessage+=" | "
+			}
+			outputMessage+=getInfo(mapF, i)
+			checkFlag++
+			if checkFlag==LINE_FLAG_MAX : checkFlag=0
+		}
+	loop
+	if int(dataInfoS)>0 {
+		g=-1
+		checkFlag=0
+		outputMessage+="\nS:1_IN_"+dataInfoS
+		repeat getCurrentCount(mapS)
+			i=cnt
+			if dataFlagS(i)==1 {
+				if checkFlag==0 {
+					outputMessage+="\nS:"
+				} else : if checkFlag>0 {
+					outputMessage+=" | "
+				}
+				outputMessage+=getInfo(mapS, i)
+				checkFlag++
+				if checkFlag==LINE_FLAG_MAX : checkFlag=0
+			}
+		loop
+	}
+	repeat ESCORT_MAX
+		i=cnt
+		if dataInfoR1(i)!=0 {
+			outputMessage+="\nR:"+dataInfoR1(i)+":"+dataInfoR2(i)
+		}
+	loop
+	repeat DROP_MAX
+		i=cnt
+		if dataInfoA1(i)!=0 {
+			outputMessage+="\nA:"+dataInfoA1(i)+":"+dataInfoA2(i)+":"+dataInfoA3(i)
+		}
+	loop
+	if int(dataInfoV)>0 : outputMessage+="\nV:"+dataInfoV
+
+	if dataInfoD2!="" {
+		split dataInfoD2,"\n",arrayD2
+		lengthD2=stat
+		repeat lengthD2
+			i=cnt
+			outputMessage+="\nD:$"+arrayD2(i)
+		loop
+	}
+	if dataInfoD1!="" {
+		split dataInfoD1,"\n", arrayD1
+		lengthD1=stat
+		repeat lengthD1
+			i=cnt
+			outputMessage+="\nD:"+arrayD1(i)
+		loop
+	}
+	objprm dataInOutId,outputMessage
+	stop
+
+*rinfoInput
+	gosub *allDataInitialize
+	
+	//メイン処理
+	notesel dataInOut
+	noteLength=noteinfo(0)
+	noteLine=""
+	noteHead=""
+	noteArray1=""
+	noteLengthA1=0
+	noteArray2=""
+	noteCountB=0
+	noteCountR=0
+	noteCountA=0
+	noteFlavorJapan=""
+	noteFlagJapan=0
+	noteFlavorEnglish=""
+	noteFlagEnglish=0
+	repeat noteLength
+		i=cnt
+		noteget noteLine,i
+		if strlen(noteLine)==0 : continue
+		noteHead=strmid(noteLine,0,1) //先頭の文字を取得
+		if noteHead=="D" {
+			if strlen(noteLine)<3 : continue
+			noteLine=strtrim(noteLine,1,'D')
+			noteLine=strtrim(noteLine,1,':')
+			temp=strmid(noteLine,0,1)//先頭を取得
+			if temp=="$" { //英語フレーバー
+				noteLine=strtrim(noteLine,1,'$')//左端の$を削除
+				if noteFlagEnglish==1 : noteFlavorEnglish+="\n"
+				noteFlavorEnglish+=noteLine
+				if noteFlagEnglish==0 : noteFlagEnglish=1
+			} else { //日本語フレーバー
+				if noteFlagJapan==1 : noteFlavorJapan+="\n"
+				noteFlavorJapan+=noteLine
+				if noteFlagJapan==0 : noteFlagJapan=1
+			}
+		} else {
+			split noteLine,":",noteArray1
+			noteLengthA1=stat
+			if noteHead=="N" {
+				if noteLengthA1<3 : continue
+				gsel GSEL_MAIN
+				objprm baseIdN,noteArray1(2)
+			} else : if noteHead=="E" {
+				if noteLengthA1<2 : continue
+				gsel GSEL_MAIN
+				objprm baseIdE,noteArray1(1)
+			} else : if noteHead=="G" {
+				if noteLengthA1<3 : continue
+				gsel GSEL_MAIN
+				objprm baseIdG,noteArray1(1)
+				temp=searchInfo(mapG2,noteArray1(2))
+				if temp>=0 : objprm baseIdG+1,temp
+			} else : if noteHead=="I" {
+				if noteLengthA1<length(dataInfoI)+1 : continue
+				gsel GSEL_MAIN
+				repeat length(dataInfoI)
+					i=cnt
+					if i==ACCEL_ID {
+						objprm baseIdI+i,int(noteArray1(i+1))-ACCEL_PLUS
+					} else {
+						objprm baseIdI+i,noteArray1(i+1)
+					}
+				loop
+			} else : if noteHead=="W" {
+				if noteLengthA1<length(dataInfoW)+1 : continue
+				gsel GSEL_MAIN
+				repeat length(dataInfoW) //謎の0を飛ばす必要がある
+					i=cnt
+					temp=0
+					if i<2 : temp=0 : else : temp=1
+					objprm baseIdW+i,noteArray1(i+1+temp)
+				loop
+			} else : if noteHead=="B" {
+				if noteLengthA1<4 or noteCountB==MELEE_MAX : continue
+				gsel GSEL_MAIN
+				temp=searchInfo(mapBM,noteArray1(1))
+				if temp>=0 : objprm baseIdB+noteCountB*3,temp
+				temp=searchInfo(mapBE,noteArray1(2))
+				if temp>=0 : objprm baseIdB+1+noteCountB*3,temp
+				objprm baseIdB+2+noteCountB*3,noteArray1(3)
+				noteCountB++
+			} else : if noteHead=="F" {
+				if noteLengthA1<2 : continue
+				gsel GSEL_F
+				noteArray1(1)=strtrim(noteArray1(1),3,' ') //行内の全ての半角スペースを削除
+				split noteArray1(1),"|",noteArray2
+				repeat length(noteArray2)
+					i=cnt
+					temp=searchInfo(mapF,noteArray2(i))
+					if temp>=0 : objprm checkBoxBaseF+temp,1
+				loop
+			} else : if noteHead=="S" {
+				if noteLengthA1<2 : continue
+				gsel GSEL_S
+				noteArray1(1)=strtrim(noteArray1(1),3,' ')
+				split noteArray1(1),"|",noteArray2
+				repeat length(noteArray2)
+					i=cnt
+					temp=searchInfo(mapS,noteArray2(i))
+					if temp>=0 {
+						objprm checkBoxBaseS+temp,1
+					} else {
+						if instr(noteArray2(i),0,"1_IN_")>=0 {
+							strrep noteArray2(i),"1_IN_",""
+							objprm baseIdS,int(noteArray2(i))
+						}
+					}
+				loop
+			} else : if noteHead=="R" {
+				if noteLengthA1<3 or noteCountR==ESCORT_MAX : continue
+				gsel GSEL_MAIN
+				objprm baseIdR+noteCountR*2,int(noteArray1(1))
+				objprm baseIdR+noteCountR*2+1,noteArray1(2)
+				noteCountR++
+			} else : if noteHead=="A" {
+				if noteLengthA1<4 or noteCountA==DROP_MAX : continue
+				gsel GSEL_MAIN
+				objprm baseIdA+noteCountA*3,int(noteArray1(1))
+				objprm baseIdA+noteCountA*3+1,int(noteArray1(2))
+				objprm baseIdA+noteCountA*3+2,int(noteArray1(3))
+				noteCountA++
+			} else : if noteHead=="V" {
+				if noteLengthA1<2 : continue
+				gsel GSEL_MAIN
+				objprm baseIdV,int(noteArray1(1))
+			}
+		}
+	loop
+	gsel GSEL_MAIN
+	if noteFlagJapan>0 : objprm baseIdD,noteFlavorJapan
+	if noteFlagEnglish>0 : objprm baseIdD+1,noteFlavorEnglish
+	noteunsel
+	stop
+
+*rinfoFileOutput
+	stop
+
+*rinfoFileInput
+	stop
+
+	#define ctype LOWORD(%1) (%1 & $FFFF)
+	#define ctype HIWORD(%1) (%1 >> 16 & $FFFF)
+
+*allDataInitialize
+	//チェックボックス初期化
+	gsel GSEL_F
+	repeat getCurrentCount(mapF)
+		i=cnt
+		objprm checkBoxBaseF+i,0
+	loop
+	gsel GSEL_S
+	objprm baseIdS,0
+	repeat getCurrentCount(mapS)
+		i=cnt
+		objprm checkBoxBaseS+i,0
+	loop
+
+	gsel GSEL_MAIN
+
+	objprm baseIdN,""
+	objprm baseIdE,""
+
+	objprm baseIdG,""
+	objprm baseIdG+1,0
+	objprm baseIdV,0
+	repeat 5
+		i=cnt
+		objprm baseIdI+i,0
+		objprm baseIdW+i,0
+	loop
+	repeat MELEE_MAX
+		i=cnt
+		objprm baseIdB+i*3,0
+		objprm baseIdB+1+i*3,0
+		objprm baseIdB+2+i*3,""
+	loop
+	repeat ESCORT_MAX
+		i=cnt
+		objprm baseIdR+i*2,0
+		objprm baseIdR+1+i*2,""
+	loop
+	repeat DROP_MAX
+		i=cnt
+		objprm baseIdA+i*3,0
+		objprm baseIdA+1+i*3,0
+		objprm baseIdA+2+i*3,0
+	loop
+
+	objprm baseIdD,""
+	objprm baseIdD+1,""
+
+	return
+
+*activate
+;	0=非アクティブ化、1=クリック外でアクティブ化、2=マウスクリックでアクティブ化
+//	mes "状態: "+LOWORD(wparam)
+
+;	0=通常、0以外=最小化状態
+//	mes "最小化: "+HIWORD(wparam)
+
+	activateParam1=LOWORD(wparam)
+	activateParam2=HIWORD(wparam)
+	if activateParam1==1 {
+		gsel 1,1
+		gsel 2,1
+		await 1
+		gsel 0,1
+	}
+	if activateParam2!=0 {
+		gsel 1,-1
+		gsel 2,-1
+	}
+
+	return
+
+	#define ANSWER_YES 6
+	#define ANSWER_NO 7
+*closing
+	dialog "終了しますか？",2,"r_info_maker"
+	closingAnswer=stat
+	if closingAnswer==ANSWER_YES : end : else : return
+	return
